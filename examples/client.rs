@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = Client::builder(TokioExecutor::new()).build::<_, Empty<Bytes>>(https);
 
-    let mut res = client.get("https://hyper.rs".parse()?).await?;
+    let mut res = client.get("https://hyper.rs".parse()?).await?.1;
 
     println!("Status: {}", res.status());
     println!("Headers:\n{:#?}", res.headers());
