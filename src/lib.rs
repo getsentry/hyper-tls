@@ -17,7 +17,7 @@
 //!     let https = HttpsConnector::new();
 //!     let client = Client::builder(TokioExecutor::new()).build::<_, Empty<Bytes>>(https);
 //!
-//!     let res = client.get("https://hyper.rs".parse()?).await?;
+//!     let res = client.get("https://hyper.rs".parse()?).await?.1;
 //!     assert_eq!(res.status(), 200);
 //!     Ok(())
 //! }
