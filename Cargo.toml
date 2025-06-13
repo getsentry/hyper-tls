@@ -17,8 +17,8 @@ vendored = ["native-tls/vendored"]
 
 [dependencies]
 bytes = "1"
-hyper = { git = "https://github.com/getsentry/hyper", rev="ee9cad6e9c586742237fe48f1df7dfb1e029a086"  }
-hyper-util = { git = "https://github.com/getsentry/hyper-util", rev = "3a4d4561c3c970e637f73efe73b02832fe1fcd1d", features = ["client-legacy", "tokio"] }
+hyper = { git = "https://github.com/getsentry/hyper", rev="f63c131545499b0c32eb1315224ce2823d8d5fda"  }
+hyper-util = { git = "https://github.com/getsentry/hyper-util", rev = "577f70dceb65e8e9dff3dc8c19e79ce877a15cbc", features = ["client-legacy", "tokio"] }
 native-tls = "0.2.1"
 tokio = "1"
 tokio-native-tls = "0.3"
@@ -26,5 +26,5 @@ tower-service = "0.3"
 
 [dev-dependencies]
 http-body-util = "0.1.0"
-hyper-util = { git = "https://github.com/getsentry/hyper-util", rev = "3a4d4561c3c970e637f73efe73b02832fe1fcd1d", features = ["http1"] }
+hyper-util = { git = "https://github.com/getsentry/hyper-util", rev = "577f70dceb65e8e9dff3dc8c19e79ce877a15cbc", features = ["http1"] }
 tokio = { version = "1.0.0", features = ["io-std", "macros", "io-util"] }
