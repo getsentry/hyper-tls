@@ -44,16 +44,7 @@ impl<T> From<TlsStream<TokioIo<T>>> for MaybeHttpsStream<T> {
         let tokio = x.get_mut();
         let stats = tokio.stats();
 
-        MaybeHttpsStream::Https(TokioIo::new(
-            inner,
-            stats.start_time,
-            stats.dns_resolve_start,
-            stats.dns_resolve_end,
-            stats.connect_start,
-            stats.connect_end,
-            stats.tls_connect_start,
-            stats.tls_connect_end,
-        ))
+        MaybeHttpsStream::Https(TokioIo::new(inner, stats))
     }
 }
 
@@ -67,7 +58,7 @@ impl<T: Read + Write + Stats + Unpin> Stats for MaybeHttpsStream<T>
 where
     T: Stats,
 {
-    fn stats(&mut self) -> hyper::rt::ConnectionStats {
+    fn stats(&mut self) -> Option<hyper::rt::ConnectionStats> {
         match self {
             MaybeHttpsStream::Http(t) => t.stats(),
             MaybeHttpsStream::Https(tokio_io) => tokio_io.stats(),

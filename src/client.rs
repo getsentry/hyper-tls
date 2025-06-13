@@ -1,5 +1,5 @@
 use hyper::{
-    rt::{Read, Stats, Write},
+    rt::{ConnectionStats, Read, Stats, Write},
     Uri,
 };
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioIo};
@@ -151,19 +151,21 @@ where
 
             let maybe = if is_https {
                 let stats = tcp.stats();
-                let stream = TokioIo::new(tcp, None, None, None, None, None, None, None);
+                let stream = TokioIo::new(tcp, None);
                 let tls_start = std::time::Instant::now();
                 let tls_stream = tls_connector.connect(&host, stream).await?;
                 let tls_end = std::time::Instant::now();
                 let tls = TokioIo::new(
                     tls_stream,
-                    stats.start_time,
-                    stats.dns_resolve_start,
-                    stats.dns_resolve_end,
-                    stats.connect_start,
-                    stats.connect_end,
-                    Some(tls_start),
-                    Some(tls_end),
+                    stats.map(|s| ConnectionStats {
+                        start_time: s.start_time,
+                        dns_resolve_start: s.dns_resolve_start,
+                        dns_resolve_end: s.dns_resolve_end,
+                        connect_start: s.connect_start,
+                        connect_end: s.connect_end,
+                        tls_connect_start: Some(tls_start),
+                        tls_connect_end: Some(tls_end),
+                    }),
                 );
                 MaybeHttpsStream::Https(tls)
             } else {
