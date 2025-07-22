@@ -159,6 +159,7 @@ where
                     tls_stream,
                     stats.map(|s| ConnectionStats {
                         start_time: s.start_time,
+                        start_time_timestamp: s.start_time_timestamp,
                         dns_resolve_start: s.dns_resolve_start,
                         dns_resolve_end: s.dns_resolve_end,
                         connect_start: s.connect_start,
