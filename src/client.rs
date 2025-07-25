@@ -157,16 +157,7 @@ where
                 let tls_end = std::time::Instant::now();
                 let tls = TokioIo::new(
                     tls_stream,
-                    stats.map(|s| ConnectionStats {
-                        start_time: s.start_time,
-                        start_time_timestamp: s.start_time_timestamp,
-                        dns_resolve_start: s.dns_resolve_start,
-                        dns_resolve_end: s.dns_resolve_end,
-                        connect_start: s.connect_start,
-                        connect_end: s.connect_end,
-                        tls_connect_start: Some(tls_start),
-                        tls_connect_end: Some(tls_end),
-                    }),
+                    stats.map(|s| ConnectionStats::tls_new(s, tls_start, tls_end)),
                 );
                 MaybeHttpsStream::Https(tls)
             } else {
