@@ -143,7 +143,7 @@ where
             .unwrap_or("")
             .trim_matches(|c| c == '[' || c == ']')
             .to_owned();
-        let connecting = self.http.call((dst, req_id));
+        let connecting = self.http.call((dst, req_id.clone()));
 
         let tls_connector = self.tls.clone();
 
@@ -157,13 +157,13 @@ where
                 let tls_stream = match tls_connector.connect(&host, stream).await {
                     Ok(tls_stream) => tls_stream,
                     Err(e) => {
-                        hyper::stats::get_request_stats(req_id)
+                        hyper::stats::get_request_stats(&req_id)
                             .set_tls_connect(AbsoluteDuration::new(tls_start, Instant::now()));
                         return Err(e)?;
                     }
                 };
                 let tls_end = Instant::now();
-                hyper::stats::get_request_stats(req_id)
+                hyper::stats::get_request_stats(&req_id)
                     .set_tls_connect(AbsoluteDuration::new(tls_start, tls_end));
                 let tls = TokioIo::new(tls_stream);
                 MaybeHttpsStream::Https(tls)
