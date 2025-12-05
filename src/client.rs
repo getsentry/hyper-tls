@@ -1,5 +1,5 @@
 use hyper::{
-    rt::{ConnectionStats, Read, Stats, Write},
+    rt::{Read, Write},
     stats::{AbsoluteDuration, RequestId},
     Uri,
 };
@@ -115,7 +115,7 @@ impl<T: fmt::Debug> fmt::Debug for HttpsConnector<T> {
 impl<T> Service<(Uri, RequestId)> for HttpsConnector<T>
 where
     T: Service<(Uri, RequestId)>,
-    T::Response: Read + Write + Stats + Send + Unpin,
+    T::Response: Read + Write + Send + Unpin,
     T::Future: Send + 'static,
     T::Error: Into<BoxError>,
 {
@@ -148,12 +148,11 @@ where
         let tls_connector = self.tls.clone();
 
         let fut = async move {
-            let mut tcp: <T as Service<(Uri, RequestId)>>::Response =
+            let tcp: <T as Service<(Uri, RequestId)>>::Response =
                 connecting.await.map_err(Into::into)?;
 
             let maybe = if is_https {
-                let stats = tcp.stats();
-                let stream = TokioIo::new(tcp, None);
+                let stream = TokioIo::new(tcp);
                 let tls_start = Instant::now();
                 let tls_stream = match tls_connector.connect(&host, stream).await {
                     Ok(tls_stream) => tls_stream,
@@ -166,12 +165,7 @@ where
                 let tls_end = Instant::now();
                 hyper::stats::get_request_stats(req_id)
                     .set_tls_connect(AbsoluteDuration::new(tls_start, tls_end));
-                let tls = TokioIo::new(
-                    tls_stream,
-                    stats.map(|s| {
-                        ConnectionStats::tls_new(s, AbsoluteDuration::new(tls_start, tls_end))
-                    }),
-                );
+                let tls = TokioIo::new(tls_stream);
                 MaybeHttpsStream::Https(tls)
             } else {
                 MaybeHttpsStream::Http(tcp)
@@ -191,7 +185,7 @@ type BoxedFut<T> = Pin<Box<dyn Future<Output = Result<MaybeHttpsStream<T>, BoxEr
 /// A Future representing work to connect to a URL, and a TLS handshake.
 pub struct HttpsConnecting<T>(BoxedFut<T>);
 
-impl<T: Read + Write + Stats + Unpin> Future for HttpsConnecting<T> {
+impl<T: Read + Write + Unpin> Future for HttpsConnecting<T> {
     type Output = Result<MaybeHttpsStream<T>, BoxError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
