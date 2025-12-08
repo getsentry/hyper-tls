@@ -1,12 +1,13 @@
 use hyper::{
-    rt::{ConnectionStats, Read, Stats, Write},
+    rt::{Read, Write},
+    stats::{AbsoluteDuration, RequestId},
     Uri,
 };
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioIo};
-use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{fmt, time::Instant};
 use tokio_native_tls::TlsConnector;
 use tower_service::Service;
 
@@ -111,10 +112,10 @@ impl<T: fmt::Debug> fmt::Debug for HttpsConnector<T> {
     }
 }
 
-impl<T> Service<Uri> for HttpsConnector<T>
+impl<T> Service<(Uri, RequestId)> for HttpsConnector<T>
 where
-    T: Service<Uri>,
-    T::Response: Read + Write + Stats + Send + Unpin,
+    T: Service<(Uri, RequestId)>,
+    T::Response: Read + Write + Send + Unpin,
     T::Future: Send + 'static,
     T::Error: Into<BoxError>,
 {
@@ -130,7 +131,7 @@ where
         }
     }
 
-    fn call(&mut self, dst: Uri) -> Self::Future {
+    fn call(&mut self, (dst, req_id): (Uri, RequestId)) -> Self::Future {
         let is_https = dst.scheme_str() == Some("https");
         // Early abort if HTTPS is forced but can't be used
         if !is_https && self.force_https {
@@ -142,23 +143,29 @@ where
             .unwrap_or("")
             .trim_matches(|c| c == '[' || c == ']')
             .to_owned();
-        let connecting = self.http.call(dst);
+        let connecting = self.http.call((dst, req_id.clone()));
 
         let tls_connector = self.tls.clone();
 
         let fut = async move {
-            let mut tcp = connecting.await.map_err(Into::into)?;
+            let tcp: <T as Service<(Uri, RequestId)>>::Response =
+                connecting.await.map_err(Into::into)?;
 
             let maybe = if is_https {
-                let stats = tcp.stats();
-                let stream = TokioIo::new(tcp, None);
-                let tls_start = std::time::Instant::now();
-                let tls_stream = tls_connector.connect(&host, stream).await?;
-                let tls_end = std::time::Instant::now();
-                let tls = TokioIo::new(
-                    tls_stream,
-                    stats.map(|s| ConnectionStats::tls_new(s, tls_start, tls_end)),
-                );
+                let stream = TokioIo::new(tcp);
+                let tls_start = Instant::now();
+                let tls_stream = match tls_connector.connect(&host, stream).await {
+                    Ok(tls_stream) => tls_stream,
+                    Err(e) => {
+                        hyper::stats::get_request_stats(&req_id)
+                            .set_tls_connect(AbsoluteDuration::new(tls_start, Instant::now()));
+                        return Err(e)?;
+                    }
+                };
+                let tls_end = Instant::now();
+                hyper::stats::get_request_stats(&req_id)
+                    .set_tls_connect(AbsoluteDuration::new(tls_start, tls_end));
+                let tls = TokioIo::new(tls_stream);
                 MaybeHttpsStream::Https(tls)
             } else {
                 MaybeHttpsStream::Http(tcp)
@@ -178,7 +185,7 @@ type BoxedFut<T> = Pin<Box<dyn Future<Output = Result<MaybeHttpsStream<T>, BoxEr
 /// A Future representing work to connect to a URL, and a TLS handshake.
 pub struct HttpsConnecting<T>(BoxedFut<T>);
 
-impl<T: Read + Write + Stats + Unpin> Future for HttpsConnecting<T> {
+impl<T: Read + Write + Unpin> Future for HttpsConnecting<T> {
     type Output = Result<MaybeHttpsStream<T>, BoxError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
